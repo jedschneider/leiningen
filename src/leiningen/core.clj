@@ -1,18 +1,26 @@
 (ns leiningen.core
-  (:use [clojure.contrib.with-ns]
-        [clojure.contrib.find-namespaces :only [find-namespaces-on-classpath]])
+  (:use [clojure.contrib.find-namespaces :only [find-namespaces-on-classpath]]
+        [clojure.walk :only [walk]])
   (:import [java.io File])
   (:gen-class))
 
 (def project nil)
+
+(defn- unquote-project [args]
+  (walk (fn [item]
+          (cond (and (seq? item) (= `unquote (first item))) (second item)
+                (symbol? item) (list 'quote item)
+                :else (unquote-project item)))
+        identity
+        args))
 
 (defmacro defproject [project-name version & args]
   ;; This is necessary since we must allow defproject to be eval'd in
   ;; any namespace due to load-file; we can't just create a var with
   ;; def or we would not have access to it once load-file returned.
   `(do
-     (let [m# (apply hash-map (quote ~args))
-           root# ~(.getParent (java.io.File. *file*))]
+     (let [m# (apply hash-map ~(cons 'list (unquote-project args)))
+           root# ~(.getParent (File. *file*))]
        (alter-var-root #'project
                        (fn [_#] (assoc m#
                                   :name ~(name project-name)
@@ -29,6 +37,9 @@
                                                  (str root# "/test"))
                                   :resources-path (or (:resources-path m#)
                                                       (str root# "/resources"))
+                                  :test-resources-path
+                                  (or (:test-resources-path m#)
+                                      (str root# "/test-resources"))
                                   :jar-dir (or (:jar-dir m#) root#)
                                   :root root#))))
      (def ~(symbol (name project-name)) project)))
@@ -65,33 +76,13 @@
      (catch java.io.FileNotFoundException e
        #'task-not-found))))
 
-(defn- hookize [v]
-  (when-not (::hooks (meta @v))
-    (alter-var-root v vary-meta assoc ::hooks (atom []))))
-
-(defn add-hook [task-var f]
-  (hookize task-var)
-  (swap! (::hooks (meta @task-var)) conj f))
-
-(defn- load-hooks [task]
+(defn- load-hooks []
   (doseq [n (sort (find-namespaces-on-classpath))
           :when (re-find #"^leiningen\.hooks\." (name n))]
-    (require n)))
-
-;; These two were taken from fixtures in clojure.test; thanks Stuart!
-(defn- compose-hooks [f1 f2]
-  (fn [g] (f1 (fn [] (f2 g)))))
-
-(defn- join-hooks [hooks]
-  (reduce compose-hooks #(%) (and hooks @hooks)))
-
-(defn run-task
-  "Run the given task with its hooks activated."
-  [task-name args]
-  (let [task (resolve-task task-name)]
-    (load-hooks task-name)
-    ((join-hooks (::hooks (meta @task)))
-     #(apply @task args))))
+    (try (require n)
+         (catch Exception e
+           (when-not (empty? (.list (File. "lib")))
+             (println "Problem loading hooks:" n (.getMessage e)))))))
 
 (defn ns->path [n]
   (str (.. (str n)
@@ -105,17 +96,19 @@
       (replace \/ \.)))
 
 (defn -main
-  ([& [task & args]]
-     (let [task (or (@aliases task) task "help")
-           args (if (@no-project-needed task)
+  ([& [task-name & args]]
+     (let [task-name (or (@aliases task-name) task-name "help")
+           args (if (@no-project-needed task-name)
                   args
                   (conj args (read-project)))
            compile-path (:compile-path (first args))]
        (when compile-path (.mkdirs (File. compile-path)))
        (binding [*compile-path* compile-path]
+         (load-hooks)
          ;; TODO: can we catch only task-level arity problems here?
          ;; compare args and (:arglists (meta (resolve-task task)))?
-         (let [value (run-task task args)]
+         (let [task (resolve-task task-name)
+               value (apply task args)]
            (when (integer? value)
              (System/exit value))))))
   ([] (apply -main (or *command-line-args* ["help"]))))

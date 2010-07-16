@@ -5,10 +5,32 @@
 
 ;; The project is named "sample", and its group-id is "org.example".
 (defproject org.example/sample "1.0.0-SNAPSHOT" ; version "1.0.0-SNAPSHOT"
+  ;; Beyond this point you may prepend a form with unquote, or ~, to eval it.
+
   ;; The descrption is used to allow searchability when uploaded to Clojars.
   :description "A sample project"
   ;; The URL is also metadata that Clojars uses.
   :url "http://example.org/sample-clojure-project"
+  ;; The mailing list of the project. If the project has multiple mailing
+  ;; lists, use the :mailing-lists key (bound to a seq of mailing list
+  ;; descriptions as below).
+  :mailing-list {:name "sample mailing list"
+                 :archive "http://example.org/sample-mailing-list-archives"
+                 :other-archives ["http://example.org/sample-list-archive2"
+                                  "http://example.org/sample-list-archive3"]
+                 :post "list@example.org"
+                 :subscribe "list-subscribe@example.org"
+                 :unsubscribe "list-unsubscribe@example.org"}
+  ;; The project's license. :distribution should be :repo or :manual;
+  ;; :repo means it is ok for public repositories to host this project's
+  ;; artifacts. :licence can be used in place of :license, and for projects
+  ;; which allow their users to choose among several licenses, :licenses
+  ;; and :licences keys are supported. NB. all licenses mentioned in
+  ;; project.clj under any of the supported keys will be put in pom.xml.
+  :license {:name "Eclipse Public License - v 1.0"
+            :url "http://www.eclipse.org/legal/epl-v10.html"
+            :distribution :repo
+            :comments "same as Clojure"}
   ;; Dependencies are listed as [group-id/name version].
   :dependencies [[org.clojure/clojure "1.1.0"]
                  [org.clojure/clojure-contrib "1.1.0"]
@@ -16,6 +38,9 @@
                                               javax.jms/jms
                                               com.sun.jdmk/jmxtools
                                               com.sun.jmx/jmxri]]]
+  ;; Before fetching dependencies, the contents of the lib/ directory
+  ;; will get deleted unless this is set to true.
+  :disable-implicit-clean false
   ;; Dev dependencies are intended for use only during
   ;; development. Projects that depend on this project will not pull
   ;; in its dev-dependencies, and they won't be included in the uberjar.
@@ -38,5 +63,7 @@
   :resources-path "src/main/resources"
   :native-path "src/native" ; where to look for native dependencies
   :jar-dir "target/" ; where to place the project's jar file
+  :jar-name "sample.jar" ; name of the jar produced by 'lein jar'
+  :uberjar-name "sample-standalone.jar" ; as above for uberjar
   ;; You can set JVM-level options here.
   :jvm-opts "-Xmx1g")

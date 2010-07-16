@@ -2,8 +2,12 @@
   "Install jars for all dependencies in lib."
   (:require [lancet])
   (:use [leiningen.pom :only [default-repos make-dependency]]
+        [leiningen.clean :only [empty-directory]]
         [clojure.java.io :only [file]])
-  (:import [org.apache.maven.artifact.ant DependenciesTask RemoteRepository]
+  (:import [org.apache.maven.artifact.ant Authentication
+                                          DependenciesTask
+                                          RemoteRepository]
+           org.apache.maven.settings.Server
            [org.apache.tools.ant.util FlatFileNameMapper]))
 
 ;; Add symlinking to Lancet's toolbox.
@@ -29,10 +33,17 @@
 
 ;; TODO: unify with pom.clj
 
-(defn make-repository [[id url]]
-  (doto (RemoteRepository.)
-    (.setId id)
-    (.setUrl url)))
+(defn make-repository [[id settings]]
+  (let [repo (RemoteRepository.)]
+    (.setId repo id)
+    (if (string? settings)
+      (.setUrl repo settings)
+      (let [{:keys [url username password]} settings]
+        (.setUrl repo url)
+        (.addAuthentication repo (Authentication. (doto (Server.)
+                                                    (.setUsername username)
+                                                    (.setPassword password))))))
+    repo))
 
 (defn get-repository-list [project]
   (concat
@@ -42,22 +53,11 @@
    (:repositories project)))
 
 (defn deps
-  "Download and install all :dependencies listed in project.clj into the lib/
-directory. With an argument it will skip development dependencies. Dependencies
-should be a vector of entries specifying group, name, and version like the
-following:
-  [org.clojure/clojure-contrib \"1.0-SNAPSHOT\"]
-
-It is also possible to exclude specific indirect dependencies of a direct
-dependency using the optional :exclusions keyword and vector of entries.
-A project that depends on log4j could exclude unnecessary indirect
-dependencies with the following:
-  [log4j \"1.2.15\" :exclusions [javax.mail/mail
-                                 javax.jms/jms
-                                 com.sun.jdmk/jmxtools
-                                 com.sun.jmx/jmxri]]"
-  ;; TODO: get deps from ~/.m2 while offline
+  "Download and install all :dependencies listed in project.clj.
+With an argument it will skip development dependencies."
   ([project skip-dev set]
+     (when-not (:disable-implicit-clean project)
+       (empty-directory (:library-path project)))
      (let [deps-task (DependenciesTask.)]
        (.setBasedir lancet/ant-project (:root project))
        (.setFilesetId deps-task "dependency.fileset")
@@ -67,14 +67,12 @@ dependencies with the following:
          (.addConfiguredRemoteRepository deps-task r))
        (doseq [dep (project set)]
          (.addDependency deps-task (make-dependency dep)))
-       ;; TODO: this is starting a rogue thread keeping the JVM from exiting
        (.execute deps-task)
        (.mkdirs (file (:library-path project)))
        (copy-dependencies (:jar-behavior project)
                           (:library-path project) true
                           (.getReference lancet/ant-project
                                          (.getFilesetId deps-task)))
-       (println (format "Copied %s into %s." set (:library-path project)))
        (when (and (not skip-dev) (seq (:dev-dependencies project)))
          (deps (assoc project :library-path (str (:root project) "/lib/dev"))
                true :dev-dependencies))))

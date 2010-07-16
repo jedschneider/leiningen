@@ -4,7 +4,7 @@
         [clojure.contrib.properties :only [as-properties]])
   (:import [java.io StringWriter ByteArrayOutputStream]
            [org.apache.maven.model Build Model Parent Dependency
-            Exclusion Repository Scm]
+            Exclusion Repository Scm License MailingList]
            [org.apache.maven.project MavenProject]))
 
 (def #^{:doc "A notice to place at the bottom of generated files."} disclaimer
@@ -75,9 +75,17 @@
     (.setGroupId (or (namespace excl) (name excl)))
     (.setArtifactId (name excl))))
 
-(defn make-dependency [[dep version & exclusions]]
-  (let [es (map make-exclusion (when (= (first exclusions) :exclusions)
-                                 (second exclusions)))]
+(defn make-dependency 
+  "Makes a dependency from a seq. The seq (usually a vector) should contain a symbol to define the
+group and artifact id, then a version string. The remaining arguments are combined into a map. The  value
+for the :classifier key (if present) is the classifier on the dependency (as a string). The value for
+the :exclusions key, if present, is a seq of symbols, identifying group ids and artifact ids to exclude
+from transitive dependencies."
+  [[dep version & extras]]
+  (let [extras-map (apply hash-map extras)
+        exclusions (:exclusions extras-map)
+        classifier (:classifier extras-map)
+        es (map make-exclusion exclusions)]
     (doto (Dependency.)
       ;; Allow org.clojure group to be omitted from clojure/contrib deps.
       (.setGroupId (if (and (nil? (namespace dep))
@@ -86,12 +94,33 @@
                      (or (namespace dep) (name dep))))
       (.setArtifactId (name dep))
       (.setVersion version)
+      (.setClassifier classifier)
       (.setExclusions es))))
 
 (defn make-repository [[id url]]
   (doto (Repository.)
     (.setId id)
     (.setUrl url)))
+
+(defn make-license [{:keys [name url distribution comments]}]
+  (doto (License.)
+    (.setName name)
+    (.setUrl url)
+    (.setDistribution (and distribution (clojure.core/name distribution)))
+    (.setComments comments)))
+
+(defn make-mailing-list [{:keys [name archive other-archives
+                                 post subscribe unsubscribe]}]
+  (let [mailing-list (MailingList.)]
+    (doto mailing-list
+      (.setName name)
+      (.setArchive archive)
+      (.setPost post)
+      (.setSubscribe subscribe)
+      (.setUnsubscribe unsubscribe))
+    (doseq [other-archive other-archives]
+      (.addOtherArchive mailing-list other-archive))
+    mailing-list))
 
 (def default-repos {"central" "http://repo1.maven.org/maven2"
                     "clojure" "http://build.clojure.org/releases"
@@ -109,7 +138,8 @@
                 (.setName (:name project))
                 (.setVersion (:version project))
                 (.setGroupId (:group project))
-                (.setDescription (:description project)))
+                (.setDescription (:description project))
+                (.setUrl (:url project)))
         build (doto (Build.)
                 (.setSourceDirectory (relative-path project :source-path))
                 (.setTestSourceDirectory (relative-path project :test-path)))]
@@ -120,6 +150,14 @@
       (.addRepository model (make-repository repo)))
     (when-let [scm (make-git-scm (file (:root project) ".git"))]
       (.setScm model scm))
+    (doseq [license (concat (keep #(% project)
+                                  [:licence :license])
+                            (:licences project)
+                            (:licenses project))]
+      (.addLicense model (make-license license)))
+    (doseq [mailing-list (concat (if-let [ml (:mailing-list project)] [ml] [])
+                                 (:mailing-lists project))]
+      (.addMailingList model (make-mailing-list mailing-list)))
     model))
 
 (defn make-pom
@@ -140,6 +178,7 @@
     (.getBytes (str baos))))
 
 (defn pom
+  "Write a pom.xml file to disk for Maven interop."
   ([project pom-location silently?]
      (let [pom-file (file (:root project) pom-location)]
        (copy (make-pom project true) pom-file)

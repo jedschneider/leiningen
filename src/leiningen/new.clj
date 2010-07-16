@@ -8,6 +8,10 @@ Neither group-id nor artifact-id may contain slashes."
         [clojure.contrib.string :only [join]]))
 
 (defn new
+  "Create a new project skeleton.
+lein new [group-id/]artifact-id [project-dir]
+Group-id is optional. Project-dir defaults to artifact-id if not given.
+Neither group-id nor artifact-id may contain slashes."
   ([project-name project-dir]
      (when (re-find #"(?<!clo)jure" project-name)
        (throw (IllegalArgumentException. "*jure names are no longer allowed.")))
@@ -32,7 +36,8 @@ Neither group-id nor artifact-id may contain slashes."
                (str "(ns " (str project-ns "-test")
                     "\n  (:use [" project-ns "] :reload-all)"
                     "\n  (:use [clojure.test]))\n\n"
-                    "(deftest replace-me ;; FIXME: write\n  (is false))\n"))
+                    "(deftest replace-me ;; FIXME: write\n  (is false "
+                    "\"No tests have been written.\"))\n"))
          (spit (file project-dir ".gitignore")
                (join "\n" ["pom.xml" "*jar" "lib" "classes"]))
          (spit (file project-dir "README")
@@ -42,7 +47,7 @@ Neither group-id nor artifact-id may contain slashes."
                                  "## Installation" "FIXME: write"
                                  "## License" "Copyright (C) 2010 FIXME"
                                  (str "Distributed under the Eclipse Public"
-                                      " License, the same as Clojure."\n)]))
+                                      " License, the same as Clojure.\n")]))
          (println "Created new project in:" project-dir))))
   ([project-name] (leiningen.new/new project-name
                                      (name (symbol project-name)))))

@@ -10,38 +10,42 @@ Leiningen is a build tool for Clojure designed to not set your hair on fire.
 
 Building Clojure projects with tools designed for Java can be an
 exercise in frustration. If you use Ant, you end up copying around a
-lot of the same tasks around between XML files on all your projects;
+lot of the same tasks between XML files on all your projects;
 there's a lot of repetition. Maven avoids repetition, but provides
 very little transparency into what's really going on behind the scenes
 and forces you to become a Maven expert to script a nontrivial
-build. Either way you end up writing far more XML than is necessary.
+build. Either way you must write far more XML than is decent.
 
-With Leiningen, your build is described using Clojure. You can put any
-code you like in your project.clj file; the only requirement is that
-it includes a call to defproject. You can define your own tasks in
-there if you need to, but the majority of projects should be able to
-get by on the tasks that are provided with Leiningen. If you do find a
-common task that you need to add, you can implement it as a plugin
-rather than copying and pasting among each of your projects.
+With Leiningen, you describe your build with Clojure. Any code you
+need goes in your project.clj file; the only requirement is calling
+defproject. You can define your own tasks in there if you need to, but
+most projects get by on the tasks provided with Leiningen. If you do
+find a common task that you need to add, you can implement it as a
+plugin rather than copying and pasting among each of your projects.
 
 ## Installation
 
-Leiningen bootstraps itself using the 'lein' shell script you
-download, there is no separate 'install script'. It installs its
-dependencies in $HOME/.m2/repository.
+Leiningen bootstraps itself using the <tt>lein</tt> shell script;
+there is no separate 'install script'. It installs its dependencies in
+$HOME/.m2/repository.
 
 1. Run: <tt>curl http://github.com/technomancy/leiningen/raw/stable/bin/lein >> lein</tt>
 2. Place it on your path and chmod it to be executable.
 3. Run: <tt>lein self-install</tt>
 
-This only works with stable versions of Leiningen; for development
-versions see "Hacking" below.
+For development versions you may use [the master version of the lein
+script](http://github.com/technomancy/leiningen/raw/master/bin/lein) instead.
 
 On Windows you can download
-[lein.bat](http://github.com/technomancy/leiningen/raw/stable/bin/lein.bat),
+[lein.bat](http://github.com/technomancy/leiningen/raw/master/bin/lein.bat),
 instead, though support on that platform is still experimental.
 
 ## Usage
+
+The
+[tutorial](http://github.com/technomancy/leiningen/blob/master/TUTORIAL.md)
+has a detailed walk-through of the steps involved in creating a new
+project, but here are the commonly-used tasks:
 
     $ lein new NAME # generate a new project skeleton
 
@@ -49,22 +53,16 @@ instead, though support on that platform is still experimental.
 
     $ lein test [TESTS] # run the tests in the TESTS namespaces, or all tests
 
-    $ lein repl # launch a REPL with the project classpath configured
+    $ lein repl # launch a REPL session
 
-    $ lein clean # remove all build artifacts
+    $ lein jar # package up the whole project as a .jar file
 
-    $ lein jar # create a jar of the project
-
-    $ lein uberjar # create a standalone jar that contains all dependencies
-
-    $ lein install # install in local repository
-
-These are the most commonly-used tasks; you can use "lein help" to see
-a complete list. "lein help $TASK" will show the usage for a specific one.
+Use <tt>lein help</tt> to see a complete list. <tt>lein help
+$TASK</tt> shows the usage for a specific one.
 
 ## Configuration
 
-Place a project.clj file in the project root that looks something like this:
+Place a project.clj file in the project root like this:
 
     (defproject leiningen "0.5.0-SNAPSHOT"
       :description "A build tool designed not to set your hair on fire."
@@ -73,12 +71,12 @@ Place a project.clj file in the project root that looks something like this:
                      [org.clojure/clojure-contrib "1.1.0"]
                      [ant/ant-launcher "1.6.2"]
                      [org.apache.maven/maven-ant-tasks "2.0.10"]]
-      :dev-dependencies [[org.clojure/swank-clojure "1.2.1"]])
+      :dev-dependencies [[swank-clojure "1.2.1"]])
 
-The "lein new" task will generate a project skeleton with an
-appropriate starting point from which you can work. See the file
-sample.project.clj for a detailed listing of all the configuration
-options that Leiningen knows about.
+The <tt>lein new</tt> task generates a project skeleton with an
+appropriate starting point from which you can work. See the
+[sample.project.clj](http://github.com/technomancy/leiningen/blob/master/sample.project.clj)
+file for a detailed listing of configuration options.
 
 ## FAQ
 
@@ -107,29 +105,39 @@ options that Leiningen knows about.
 
 **Q:** What's a group ID? How do snapshots work?  
 **A:** See the
-  [intro](http://github.com/technomancy/leiningen/blob/master/INTRO.md)
-  for background on JVM dependency concepts.
+  [tutorial](http://github.com/technomancy/leiningen/blob/master/TUTORIAL.md)
+  for background.
+
+**Q:** How should I pick my version numbers?  
+**A:** Use [semantic versioning](http://semver.org).
 
 **Q:** What if my project depends on jars that aren't in any repository?  
 **A:** Open-source jars can be uploaded to Clojars (see "Publishing"
-  below), though be sure to use the group-id of "org.clojars.$USERNAME"
-  in order to avoid conflicts and to allow the original authors to
-  claim it in the future once they get around to uploading. 
-  Alternatively you can do a one-off install into your local repository in
- ~/.m2 with Maven for Java libs or "lein install" for Clojure libs.
+  in the tutorial), though be sure to use the group-id of
+  "org.clojars.$USERNAME" in order to avoid conflicts and to allow the
+  original authors to claim it in the future once they get around to
+  uploading. Alternatively you can do a one-off install into your
+  local repository in ~/.m2 with Maven. Add a dependency to
+  project.clj that doesn't exist in any remote repository and run
+  <tt>lein deps</tt>, and the output will include the <tt>mvn</tt>
+  invocation to do this. It's _much_ better to get the dependency in a
+  remote repository for repeatability reasons though. For teams
+  working on private projects [Hudson](http://hudson-ci.org/) works well.
 
-**Q:** What does java.lang.NoSuchMethodError: clojure.lang.RestFn.<init>(I)V mean?  
-**A:** It means you have some code that was AOT (ahead-of-time)
-  compiled with a different version of Clojure than the one you're
-  currently using. If it persists after running "lein clean" then it
-  is a problem with your dependencies. If you depend on contrib, make
-  sure the contrib version matches the Clojure version. Also note for
-  your own project that AOT compilation in Clojure is much less
-  important than it is in other languages. There are a few
-  language-level features that must be AOT-compiled to work, generally
-  for Java interop. If you are not using any of these features, you
-  should not AOT-compile your project if other projects may depend
-  upon it.
+**Q:** How do I write my own tasks?  
+**A:** If it's a task that may be useful to more than just your
+  project, you should make it into a
+  [plugin](http://github.com/technomancy/leiningen/blob/master/PLUGINS.md).
+  You can also include one-off tasks in your src/leiningen/ directory
+  if they're not worth spinning off; the plugin guide shows how.
+
+**Q:** I want to hack two projects in parallel, but it's annoying to switch between them.  
+**A:** Use a new feature called _checkout dependencies_. If you create
+  a directory called <tt>checkouts</tt> in your project root and
+  symlink some other projects into it, Leiningen will allow you to
+  hack on them in parallel. That means changes in the dependency will
+  be visible in the main project without having to go through the
+  whole install/switch-projects/deps/restart-swank cycle.
 
 **Q:** Is it possible to exclude indirect dependencies?  
 **A:** Yes. Some libraries, such as log4j, depend on projects that are
@@ -143,35 +151,37 @@ options that Leiningen knows about.
   "super-pom". It's just a quirk of the API. It probably means there
   is a typo in your :dependency declaration in project.clj.
 
-**Q:** How should I pick my version numbers?  
-**A:** Use [semantic versioning](http://semver.org).
-
-## Publishing
-
-If your project is a library and you would like others to be able to
-use it as a dependency in their projects, you will need to get it into
-a public repository. While it's possible to maintain your own or get
-it into Maven central, the easiest way is to publish it at
-[Clojars](http://clojars.org), which is a Clojure-specific repository
-for open-source code. Once you have created an account there,
-publishing is easy:
-
-    $ lein jar && lein pom
-    $ scp pom.xml $PROJECT.jar clojars@clojars.org:
-
-Once that succeeds it will be available for other projects to depend
-on. Leiningen adds Clojars and [the Clojure nightly build
-snapshots](http://build.clojure.org) to the default repositories.
+**Q:** What does java.lang.NoSuchMethodError: clojure.lang.RestFn.<init>(I)V mean?  
+**A:** It means you have some code that was AOT (ahead-of-time)
+  compiled with a different version of Clojure than the one you're
+  currently using. If it persists after running <tt>lein clean</tt> then it
+  is a problem with your dependencies. If you depend on contrib, make
+  sure the contrib version matches the Clojure version. Also note for
+  your own project that AOT compilation in Clojure is much less
+  important than it is in other languages. There are a few
+  language-level features that must be AOT-compiled to work, generally
+  for Java interop. If you are not using any of these features, you
+  should not AOT-compile your project if other projects may depend
+  upon it.
 
 ## Hacking
 
-You'll need to bootstrap using a stable release before you can hack on
-Leiningen. Grab the stable bin script (linked under "Installation"
-above), put it on your $PATH as "lein-stable", and do "lein-stable
-self-install". Then run "lein-stable deps" in your checkout. When that
-finishes, symlink bin/lein from your checkout to your path.  This will
-make "lein" run from your checkout while "lein-stable" uses the jar
-self-installed in ~/.m2.
+Leiningen is very small. The latest release is only 890 lines of
+Clojure; you could probably read through the whole project in an hour.
+
+When you launch Leiningen, it must start an instance of Clojure to
+load itself. But this instance must not effect the project that you're
+building. It may use a different version of Clojure from Leiningen,
+and the project should be in a totally fresh JVM. Leiningen uses ant's
+<tt>java</tt> task to fork off a separate process for this
+purpose. The <tt>leiningen.compile</tt> namespace implements this;
+specifically the <tt>eval-in-project</tt> function. Any code that must
+execute within the context of the project (AOT compilation, test runs)
+needs to go through this function.
+
+Leiningen tasks are simply Clojure functions that take the current
+project as their first argument followed by any further arguments that
+were given on the command-line.
 
 The [mailing list](http://groups.google.com/group/leiningen) and the
 leiningen or clojure channels on Freenode are the best places to
@@ -193,7 +203,7 @@ either.
 
 Leiningen is extensible; you can define new tasks in plugins. Add your
 plugin as a dev-dependency of your project, and you'll be able to call
-"lein $YOUR_COMMAND". See the file PLUGINS.md for details.
+<tt>lein $YOUR_COMMAND</tt>. See the [plugins guide](http://github.com/technomancy/leiningen/blob/master/PLUGINS.md) for details.
 
 See the [complete list of known issues](http://github.com/technomancy/leiningen/issues).
 
